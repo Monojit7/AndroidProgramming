@@ -30,6 +30,7 @@ import android.location.Geocoder;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
@@ -44,8 +45,9 @@ import java.util.List;
 public class BasicMapDemoActivity extends AppCompatActivity implements OnMapReadyCallback {
 
     private GoogleMap mMap;
-    LocationManager locationManager;
-    private  static  String TAG = "BasicMapDemoActivity";
+
+    private static String TAG = "BasicMapDemoActivity";
+   // private BackGroundActivity mBackGroundActivity;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -55,112 +57,12 @@ public class BasicMapDemoActivity extends AppCompatActivity implements OnMapRead
         SupportMapFragment mapFragment =
                 (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
-        locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            // TODO: Consider calling
-            //    ActivityCompat#requestPermissions
-            // here to request the missing permissions, and then overriding
-            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-            //                                          int[] grantResults)
-            // to handle the case where the user grants the permission. See the documentation
-            // for ActivityCompat#requestPermissions for more details.
-          //  return;
 
-            Log.i (TAG, "Request Permission for COARSE Location");
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 1);
-            return ;
-            
-        }
 
-        if ( locationManager.isProviderEnabled( LocationManager.NETWORK_PROVIDER) )
-        {
-            locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, new LocationListener() {
-                @Override
-                public void onLocationChanged(Location location) {
 
-                    Log.i (TAG, "Network Provider onLocationChanged ");
-                    double latitude = location.getLatitude();
-                    double logitude = location.getLongitude();
-                    // Instantiate latitude and longitude
-                    LatLng latLng = new LatLng( latitude, logitude );
 
-                    Geocoder geocoder = new Geocoder( getApplicationContext());
-                    try {
-                        List<Address> addressList =  geocoder.getFromLocation( latitude, logitude, 1 );
-                        String str = addressList.get(0).getLocality();
-                        str += addressList.get(0).getCountryName();
+       // mBackGroundActivity.execute(this);
 
-                        Log.i (TAG, "onLocationChanged " + str );
-
-                        mMap.addMarker(new MarkerOptions().position(new LatLng(latitude, logitude)).title(str));
-                        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom((new LatLng( latitude, logitude )), 10.2f));
-
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-
-                }
-
-                @Override
-                public void onStatusChanged(String provider, int status, Bundle extras) {
-
-                }
-
-                @Override
-                public void onProviderEnabled(String provider) {
-
-                }
-
-                @Override
-                public void onProviderDisabled(String provider) {
-
-                }
-            });
-
-        }
-        else if ( locationManager.isProviderEnabled( LocationManager.GPS_PROVIDER))
-        {
-            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, new LocationListener() {
-                @Override
-                public void onLocationChanged(Location location) {
-
-                    Log.i (TAG, "GPS Provider onLocationChanged ");
-                    double latitude = location.getLatitude();
-                    double logitude = location.getLongitude();
-                    // Instantiate latitude and longitude
-                    LatLng latLng = new LatLng( latitude, logitude );
-
-                    Geocoder geocoder = new Geocoder( getApplicationContext());
-                    try {
-                       List<Address> addressList =  geocoder.getFromLocation( latitude, logitude, 1 );
-                       String str = addressList.get(0).getLocality();
-                       str += addressList.get(0).getCountryName();
-                        Log.i (TAG, "onLocationChanged " + str );
-                        mMap.addMarker(new MarkerOptions().position(new LatLng(latitude, logitude)).title(str));
-                        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom((new LatLng( latitude, logitude )), 10.2f));
-
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-
-                }
-
-                @Override
-                public void onStatusChanged(String provider, int status, Bundle extras) {
-
-                }
-
-                @Override
-                public void onProviderEnabled(String provider) {
-
-                }
-
-                @Override
-                public void onProviderDisabled(String provider) {
-
-                }
-            });
-        }
 
 
     }
@@ -173,11 +75,187 @@ public class BasicMapDemoActivity extends AppCompatActivity implements OnMapRead
     @Override
     public void onMapReady(GoogleMap map) {
 
-      //  mMap = map;
-      //  mMap.addMarker(new MarkerOptions().position(new LatLng(-34, 151)).title("Marker in Sidney"));
-      //  mMap.moveCamera(CameraUpdateFactory.newLatLngZoom((new LatLng( -34, 151 )), 10.2f));
+        //  mMap = map;
+        //  mMap.addMarker(new MarkerOptions().position(new LatLng(-34, 151)).title("Marker in Sidney"));
+        //  mMap.moveCamera(CameraUpdateFactory.newLatLngZoom((new LatLng( -34, 151 )), 10.2f));
 
-        Log.i (TAG, "onMapReady "  );
+        Log.i(TAG, "onMapReady ");
+        BackGroundActivity mBackGroundActivity = new BackGroundActivity();//.execute();
+        mBackGroundActivity.execute();
+        Log.i(TAG, "mBackGroundActivity executed ");
 
+    }
+
+
+    private class BackGroundActivity extends AsyncTask<Void, Integer, Location> {
+
+        private String TAG = "BackGroundActivity";
+        private Location mLocation;
+        public LocationManager locationManager;
+
+
+
+
+        @Override
+        protected Location doInBackground(Void... voids ) {
+
+            locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+
+
+
+            /*********************************/
+
+            Log.i (TAG, "doInBackground A1");
+
+            if (locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
+
+                Log.i (TAG, "isProviderEnabled");
+                if (ActivityCompat.checkSelfPermission(BasicMapDemoActivity.this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(BasicMapDemoActivity.this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                    // TODO: Consider calling
+                    //    ActivityCompat#requestPermissions
+                    // here to request the missing permissions, and then overriding
+                    //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+                    //                                          int[] grantResults)
+                    // to handle the case where the user grants the permission. See the documentation
+                    // for ActivityCompat#requestPermissions for more details.
+
+                    Log.i (TAG, "Request Permission for COARSE Location");
+                    //ActivityCompat.requestPermissions(BasicMapDemoActivity.this, new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, 1);
+                   ActivityCompat.requestPermissions(BasicMapDemoActivity.this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 1);
+
+                   // return null;
+                }
+
+                Log.i (TAG, "RrequestLocationUpdates");
+                locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, new LocationListener() {
+                    @Override
+                    public void onLocationChanged(Location location) {
+
+                        Log.i(TAG, "Network Provider onLocationChanged ");
+                        mLocation = location;
+                        double latitude = location.getLatitude();
+                        double logitude = location.getLongitude();
+                        // Instantiate latitude and longitude
+                        LatLng latLng = new LatLng(latitude, logitude);
+
+                        Geocoder geocoder = new Geocoder(getApplicationContext());
+                        try {
+                            List<Address> addressList = geocoder.getFromLocation(latitude, logitude, 1);
+                            String str = addressList.get(0).getLocality();
+                            str += addressList.get(0).getCountryName();
+
+                            Log.i(TAG, "onLocationChanged " + str);
+
+                         //   mMap.addMarker(new MarkerOptions().position(new LatLng(latitude, logitude)).title(str));
+                         //   mMap.moveCamera(CameraUpdateFactory.newLatLngZoom((new LatLng(latitude, logitude)), 10.2f));
+
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+
+                    }
+
+                    @Override
+                    public void onStatusChanged(String provider, int status, Bundle extras) {
+
+                    }
+
+                    @Override
+                    public void onProviderEnabled(String provider) {
+
+                    }
+
+                    @Override
+                    public void onProviderDisabled(String provider) {
+
+                    }
+                });
+
+            }
+            else if ( locationManager.isProviderEnabled( LocationManager.GPS_PROVIDER))
+            {
+                locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, new LocationListener() {
+                    @Override
+                    public void onLocationChanged(Location location) {
+
+                        Log.i (TAG, "GPS Provider onLocationChanged ");
+                        mLocation = location;
+                        double latitude = location.getLatitude();
+                        double logitude = location.getLongitude();
+                        // Instantiate latitude and longitude
+                        LatLng latLng = new LatLng( latitude, logitude );
+
+                        Geocoder geocoder = new Geocoder( getApplicationContext());
+                        try {
+                            List<Address> addressList =  geocoder.getFromLocation( latitude, logitude, 1 );
+                            String str = addressList.get(0).getLocality();
+                            str += addressList.get(0).getCountryName();
+                            Log.i (TAG, "onLocationChanged " + str );
+                           /// mMap.addMarker(new MarkerOptions().position(new LatLng(latitude, logitude)).title(str));
+                           // mMap.moveCamera(CameraUpdateFactory.newLatLngZoom((new LatLng( latitude, logitude )), 10.2f));
+
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+
+                    }
+
+                    @Override
+                    public void onStatusChanged(String provider, int status, Bundle extras) {
+
+                    }
+
+                    @Override
+                    public void onProviderEnabled(String provider) {
+
+                    }
+
+                    @Override
+                    public void onProviderDisabled(String provider) {
+
+                    }
+                });
+            }
+
+
+            /********************************/
+
+            return mLocation;
+        }
+
+
+        @Override
+        protected void onProgressUpdate(Integer... progress) {
+            super.onProgressUpdate(progress);
+
+        }
+
+
+
+        @Override
+        protected void onPostExecute(Location  location) {
+            super.onPostExecute(location);
+
+            Log.i (TAG, "onPostExecute "  );
+            double latitude = location.getLatitude();
+            double logitude = location.getLongitude();
+            // Instantiate latitude and longitude
+            LatLng latLng = new LatLng( latitude, logitude );
+
+            Geocoder geocoder = new Geocoder( getApplicationContext());
+            try {
+                List<Address> addressList =  geocoder.getFromLocation( latitude, logitude, 1 );
+                String str = addressList.get(0).getLocality();
+                str += addressList.get(0).getCountryName();
+
+                Log.i (TAG, "onLocationChanged " + str );
+
+                mMap.addMarker(new MarkerOptions().position(new LatLng(latitude, logitude)).title(str));
+                mMap.moveCamera(CameraUpdateFactory.newLatLngZoom((new LatLng( latitude, logitude )), 10.2f));
+
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
     }
 }

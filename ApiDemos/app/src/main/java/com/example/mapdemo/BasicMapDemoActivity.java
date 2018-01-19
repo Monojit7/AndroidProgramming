@@ -16,9 +16,12 @@
 
 package com.example.mapdemo;
 
+import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesNotAvailableException;
 import com.google.android.gms.common.GooglePlayServicesRepairableException;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.places.Place;
 import com.google.android.gms.location.places.PlaceLikelihood;
 import com.google.android.gms.location.places.PlaceLikelihoodBufferResponse;
@@ -27,7 +30,9 @@ import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 
 import android.Manifest;
@@ -47,6 +52,7 @@ import android.location.LocationListener;
 import android.location.LocationManager;
 import android.net.Uri;
 import android.os.AsyncTask;
+import android.os.Build;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
@@ -76,355 +82,224 @@ import java.util.Locale;
 /**
  * This shows how to create a simple activity with a map and a marker on the map.
  */
-public class BasicMapDemoActivity extends AppCompatActivity implements
-        GoogleMap.OnMyLocationButtonClickListener,
-        GoogleMap.OnMyLocationClickListener,
-        OnMapReadyCallback {
 
+public class BasicMapDemoActivity extends AppCompatActivity
+        implements OnMapReadyCallback,
+        GoogleApiClient.ConnectionCallbacks,
+        GoogleApiClient.OnConnectionFailedListener
+{
 
+    GoogleMap mGoogleMap;
+    SupportMapFragment mapFrag;
+    LocationRequest mLocationRequest;
+    GoogleApiClient mGoogleApiClient;
+    Location mLastLocation;
+    Marker mCurrLocationMarker;
 
-    private GoogleMap mMap;
-    private static String TAG = "BasicMapActivity";
-    private static final int LOCATION_PERMISSION_REQUEST_CODE = 1;
-    Button searchBtn = null;
-    Intent locatorService = null;
-    AlertDialog alertDialog = null;
-    Dialog progDialog;
-    private GoogleApiClient mGoogleApiClient;
-    public GeoDataClient mGeoDataClient;
-    public PlaceDetectionClient mPlaceDetectionClient;
-    public  int PLACE_PICKER_REQUEST = 1;
-
-
-    /** Called when the activity is first created. */
+     public static String TAG = "BasicMapDemoActivity";
     @Override
-    public void onCreate(Bundle savedInstanceState) {
+    protected void onCreate(Bundle savedInstanceState)
+    {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.basic_demo);
-        SupportMapFragment mapFragment =
-                (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
-        Log.i(TAG, "start");
-       // mapFragment.getMapAsync(this);
-       // searchBtn = (Button) findViewById(R.id.currentLoc);
 
-        // Construct a GeoDataClient.
-        mGeoDataClient = Places.getGeoDataClient(this, null);
+        getSupportActionBar().setTitle("Map Location Activity");
 
-        // Construct a PlaceDetectionClient.
-        mPlaceDetectionClient = Places.getPlaceDetectionClient(this, null);
+        mapFrag = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
+        mapFrag.getMapAsync(this);
+    }
 
-        Log.i(TAG, "getPlaceDetectionClient");
-      /*  mGoogleApiClient = new GoogleApiClient
-                .Builder(this)
-                .addApi(Places.GEO_DATA_API)
-               .addApi(Places.PLACE_DETECTION_API)
-                .enableAutoManage(this, (OnConnectionFailedListener) this)
-                .build();*/
+    @Override
+    public void onPause() {
+        super.onPause();
 
-        PlacePicker.IntentBuilder builder = new PlacePicker.IntentBuilder();
-
-        @SuppressLint("MissingPermission") Task<PlaceLikelihoodBufferResponse> placeResult = mPlaceDetectionClient.getCurrentPlace(null);
-
-        Log.i(TAG, "PlacePicker");
-
-
-        try {
-            startActivityForResult(builder.build(this), PLACE_PICKER_REQUEST);
-        } catch (GooglePlayServicesRepairableException e) {
-            e.printStackTrace();
-        } catch (GooglePlayServicesNotAvailableException e) {
-            e.printStackTrace();
+        //stop location updates when Activity is no longer active
+        if (mGoogleApiClient != null) {
+           // LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient, (com.google.android.gms.location.LocationListener) BasicMapDemoActivity.this);
         }
+    }
+
+    @Override
+    public void onMapReady(GoogleMap googleMap)
+    {
+        mGoogleMap=googleMap;
+        mGoogleMap.setMapType(GoogleMap.MAP_TYPE_HYBRID);
+
+        //Initialize Google Play Services
+        if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (ContextCompat.checkSelfPermission(this,
+                    Manifest.permission.ACCESS_FINE_LOCATION)
+                    == PackageManager.PERMISSION_GRANTED) {
+                //Location Permission already granted
+                Toast.makeText(BasicMapDemoActivity.this, "onMapReady A1",  Toast.LENGTH_LONG).show();
+                buildGoogleApiClient();
+               // mGoogleMap.setMyLocationEnabled(true);
+            } else {
+                //Request Location Permission
+                checkLocationPermission();
+            }
+        }
+        else {
+            Toast.makeText(BasicMapDemoActivity.this, "onMapReady A2",  Toast.LENGTH_LONG).show();
+            buildGoogleApiClient();
+            mGoogleMap.setMyLocationEnabled(true);
+        }
+    }
+
+    protected synchronized void buildGoogleApiClient() {
+        mGoogleApiClient = new GoogleApiClient.Builder(this)
+                .addConnectionCallbacks(this)
+                .addOnConnectionFailedListener(this)
+                .addApi(LocationServices.API)
+                .build();
+        mGoogleApiClient.connect();
+        Toast.makeText(BasicMapDemoActivity.this, "GoogleAPI Client A1",  Toast.LENGTH_LONG).show();
+    }
+
+    @Override
+    public void onConnected(Bundle bundle) {
+        mLocationRequest = new LocationRequest();
+        mLocationRequest.setInterval(1000);
+        mLocationRequest.setFastestInterval(1000);
+        mLocationRequest.setPriority(LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY);
+        if (ContextCompat.checkSelfPermission(this,
+                Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED) {
+            LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, new com.google.android.gms.location.LocationListener() {
+                @Override
+                public void onLocationChanged(Location location)
+                {
+                    mLastLocation = location;
+                    if (mCurrLocationMarker != null) {
+                        mCurrLocationMarker.remove();
+                    }
+
+                    //Place current location marker
+                    LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
+                    MarkerOptions markerOptions = new MarkerOptions();
+                    markerOptions.position(latLng);
+                    markerOptions.title("Current Position");
+                    markerOptions.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_MAGENTA));
+                    mCurrLocationMarker = mGoogleMap.addMarker(markerOptions);
+
+                    double latitude = location.getLatitude();
+                    double logitude = location.getLongitude();
+
+                    String str = Double.toString( latitude ) + "   " + Double.toString( logitude ) ;
+                    Toast.makeText(BasicMapDemoActivity.this, "onLocationChanged: "+str, Toast.LENGTH_LONG).show();
+                    //move map camera
+                    mGoogleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng,11));
 
 
-
-        placeResult.addOnCompleteListener(new OnCompleteListener<PlaceLikelihoodBufferResponse>() {
-            @Override
+                    // Instantiate latitude and longitude
 
 
-            public void onComplete(@NonNull Task<PlaceLikelihoodBufferResponse> task) {
+                    Geocoder geocoder = new Geocoder(getApplicationContext());
+                    try {
+                        List<Address> addressList = geocoder.getFromLocation(latitude, logitude, 5);
+                        for ( Address adr : addressList ) {
 
-                Log.i(TAG, "onComplete");
-                Toast.makeText(BasicMapDemoActivity.this,
-                        " addOnCompleteListener",
-                        Toast.LENGTH_LONG).show();
-                PlaceLikelihoodBufferResponse likelyPlaces = task.getResult();
-                for (PlaceLikelihood placeLikelihood : likelyPlaces) {
-                    Log.i(TAG, String.format("Place '%s' has likelihood: %g",
-                            placeLikelihood.getPlace().getName(),
-                            placeLikelihood.getLikelihood()));
+                            Log.i("BasicMapActivity", "onLocationChanged " + adr.getLocality());
+                            Toast.makeText(BasicMapDemoActivity.this,
+                                    adr.getLocality(),
+                                    Toast.LENGTH_LONG).show();
+                        }
+
+                        //   mMap.addMarker(new MarkerOptions().position(new LatLng(latitude, logitude)).title(str));
+                        //   mMap.moveCamera(CameraUpdateFactory.newLatLngZoom((new LatLng(latitude, logitude)), 10.2f));
+
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+
                 }
-                likelyPlaces.release();
-            }
-        });
-
-    }
 
 
-
-    public boolean stopService() {
-        if (this.locatorService != null) {
-            this.locatorService = null;
-        }
-        return true;
-    }
-
-    public boolean startService() {
-        try {
-            // this.locatorService= new
-            // Intent(FastMainActivity.this,LocatorService.class);
-            // startService(this.locatorService);
-
-            Log.i("BasicApp", "Starting Service:");
-            FetchCordinates fetchCordinates = new FetchCordinates();
-            fetchCordinates.execute();
-            return true;
-        } catch (Exception error) {
-            return false;
-        }
-
-    }
-
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-
-        Log.i(TAG, "onActivityResult");
-        if (requestCode == PLACE_PICKER_REQUEST) {
-            if (resultCode == RESULT_OK) {
-                Log.i(TAG, "onActivityResult A1");
-                Place place = PlacePicker.getPlace(data, this);
-                String toastMsg = String.format("Place: %s", place.getName());
-                Toast.makeText(this, toastMsg, Toast.LENGTH_LONG).show();
-                Log.i(TAG, "onActivityResult A2");
-            }
+            });
         }
     }
 
-    public AlertDialog CreateAlert(String title, String message) {
-        AlertDialog alert = new AlertDialog.Builder(this).create();
-
-        alert.setTitle(title);
-
-        alert.setMessage(message);
-
-        return alert;
-
-    }
+    @Override
+    public void onConnectionSuspended(int i) {}
 
     @Override
-    public boolean onMyLocationButtonClick() {
-        return false;
-    }
+    public void onConnectionFailed(ConnectionResult connectionResult) {}
 
-    @Override
-    public void onMyLocationClick(@NonNull Location location) {
 
-        Toast.makeText(this, "Current location:\n" + location, Toast.LENGTH_LONG).show();
-    }
 
-    @Override
-    public void onMapReady(GoogleMap googleMap) {
-
-        Log.i (TAG, "onMapReady");
-        mMap = googleMap;
-
-        mMap.setOnMyLocationButtonClickListener(this);
-        mMap.setOnMyLocationClickListener(this);
-
+    public static final int MY_PERMISSIONS_REQUEST_LOCATION = 99;
+    private void checkLocationPermission() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED) {
-            // Permission to access the location is missing.
-            PermissionUtils.requestPermission(this, LOCATION_PERMISSION_REQUEST_CODE,
-                    Manifest.permission.ACCESS_FINE_LOCATION, true);
-        } else if (mMap != null) {
-            // Access to the location has been granted to the app.
-            mMap.setMyLocationEnabled(true);
-        }
 
+            // Should we show an explanation?
+            if (ActivityCompat.shouldShowRequestPermissionRationale(this,
+                    Manifest.permission.ACCESS_FINE_LOCATION)) {
+
+                Toast.makeText(this, "shouldShowRequestPermissionRationale", Toast.LENGTH_LONG).show();
+                // Show an explanation to the user *asynchronously* -- don't block
+                // this thread waiting for the user's response! After the user
+                // sees the explanation, try again to request the permission.
+                new AlertDialog.Builder(this)
+                        .setTitle("Location Permission Needed")
+                        .setMessage("This app needs the Location permission, please accept to use location functionality")
+                        .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialogInterface, int i) {
+                                //Prompt the user once explanation has been shown
+                                ActivityCompat.requestPermissions(BasicMapDemoActivity.this,
+                                        new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
+                                        MY_PERMISSIONS_REQUEST_LOCATION );
+                            }
+                        })
+                        .create()
+                        .show();
+
+
+            } else {
+                // No explanation needed, we can request the permission.
+                ActivityCompat.requestPermissions(this,
+                        new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
+                        MY_PERMISSIONS_REQUEST_LOCATION );
+            }
+        }
     }
 
-    public class FetchCordinates extends AsyncTask<String, Integer, String> {
-        ProgressDialog progDailog = null;
+    @Override
+    public void onRequestPermissionsResult(int requestCode,
+                                           String permissions[], int[] grantResults) {
+        switch (requestCode) {
+            case MY_PERMISSIONS_REQUEST_LOCATION: {
+                // If request is cancelled, the result arrays are empty.
+                if (grantResults.length > 0
+                        && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
 
-        public double lati = 0.0;
-        public double longi = 0.0;
+                    // permission was granted, yay! Do the
+                    // location-related task you need to do.
+                    if (ContextCompat.checkSelfPermission(this,
+                            Manifest.permission.ACCESS_FINE_LOCATION)
+                            == PackageManager.PERMISSION_GRANTED) {
 
-        public LocationManager mLocationManager;
-        public VeggsterLocationListener mVeggsterLocationListener;
+                        if (mGoogleApiClient == null) {
 
-        @Override
-        protected void onPreExecute() {
-            mVeggsterLocationListener = new VeggsterLocationListener();
-            mLocationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
-            mLocationManager.addTestProvider("Bangalore", false, true, true, true, true, true, true, Criteria.POWER_LOW, Criteria.ACCURACY_FINE);
+                            Toast.makeText(this, "buildGoogleApiClient", Toast.LENGTH_LONG).show();
+                            buildGoogleApiClient();
+                        }
+                        mGoogleMap.setMyLocationEnabled(true);
+                    }
 
-            Log.i("BasicApp", "onPreExecute");
-            if (ActivityCompat.checkSelfPermission(BasicMapDemoActivity.this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(BasicMapDemoActivity.this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                // TODO: Consider calling
-                //    ActivityCompat#requestPermissions
-                // here to request the missing permissions, and then overriding
-                //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-                //                                          int[] grantResults)
-                // to handle the case where the user grants the permission. See the documentation
-                // for ActivityCompat#requestPermissions for more details.
+                } else {
 
-                PermissionUtils.requestPermission(BasicMapDemoActivity.this, LOCATION_PERMISSION_REQUEST_CODE,
-                        Manifest.permission.ACCESS_FINE_LOCATION, true);
-
+                    // permission denied, boo! Disable the
+                    // functionality that depends on this permission.
+                    Toast.makeText(this, "permission denied", Toast.LENGTH_LONG).show();
+                }
                 return;
             }
 
-            if (mLocationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
-                mLocationManager.requestLocationUpdates(
-                        LocationManager.GPS_PROVIDER, 0, 0,
-                        mVeggsterLocationListener);
-
-                Toast.makeText(BasicMapDemoActivity.this,
-                        "GPS PROVIDER",
-                        Toast.LENGTH_LONG).show();
-
-                progDailog = new ProgressDialog(BasicMapDemoActivity.this, ProgressDialog.STYLE_HORIZONTAL);
-                progDailog.setOnCancelListener(new DialogInterface.OnCancelListener() {
-                    @Override
-                    public void onCancel(DialogInterface dialog) {
-                        FetchCordinates.this.cancel(true);
-                    }
-                });
-                progDailog.setMessage("Loading...");
-                progDailog.setProgress(0);
-                progDailog.setIndeterminate( true );
-                progDailog.setProgress(25);
-                progDailog.setCancelable(true);
-                progDailog.show();
-
-            }
-            else if ( mLocationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER))
-            {
-                mLocationManager.requestLocationUpdates(
-                        LocationManager.NETWORK_PROVIDER, 0, 0,
-                        mVeggsterLocationListener);
-
-                Toast.makeText(BasicMapDemoActivity.this,
-                        "NETWORK PROVIDER",
-                        Toast.LENGTH_LONG).show();
-
-                progDailog = new ProgressDialog(BasicMapDemoActivity.this);
-                progDailog.setOnCancelListener(new DialogInterface.OnCancelListener() {
-                    @Override
-                    public void onCancel(DialogInterface dialog) {
-                        FetchCordinates.this.cancel(true);
-                    }
-                });
-                progDailog.setProgress(0);
-                progDailog.setIndeterminate( true );
-                progDailog.setProgress(25);
-                progDailog.setCancelable(true);
-                progDailog.show();
-            }
+            // other 'case' lines to check for other
+            // permissions this app might request
         }
-
-
-        @Override
-        protected void onCancelled(){
-            System.out.println("Cancelled by user!");
-            progDialog.dismiss();
-            mLocationManager.removeUpdates(mVeggsterLocationListener);
-        }
-
-        @Override
-        protected void onPostExecute(String result) {
-            progDailog.dismiss();
-
-            Toast.makeText(BasicMapDemoActivity.this,
-                    "LATITUDE :" + lati + " LONGITUDE :" + longi,
-                    Toast.LENGTH_LONG).show();
-        }
-
-        @Override
-        protected String doInBackground(String... params) {
-            // TODO Auto-generated method stub
-
-            while (this.lati == 0.0) {
-
-            }
-            return null;
-        }
-
-        public class VeggsterLocationListener implements LocationListener {
-
-            @Override
-            public void onLocationChanged(Location location) {
-
-                Log.i("BasicApp", "onLocationChanged");
-                double lat = (int) location.getLatitude(); // * 1E6);
-                double  log = (int) location.getLongitude(); // * 1E6);
-
-                String uri = String.format(Locale.ENGLISH, "geo:%f,%f", lat, log);
-                Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(uri));
-                intent.setPackage("com.google.android.apps.maps");
-                startActivity(intent);
-                int acc = (int) (location.getAccuracy());
-
-                Log.i("BasicApp", "onLocationChanged latitude " + lat);
-                Log.i("BasicApp", "onLocationChanged longitude" + log);
-                progDailog.setProgress(progDailog.getMax());
-                Toast.makeText(BasicMapDemoActivity.this,
-                        " Loading completed",
-                        Toast.LENGTH_LONG).show();
-                String info = location.getProvider();
-                try {
-
-                    // LocatorService.myLatitude=location.getLatitude();
-
-                    // LocatorService.myLongitude=location.getLongitude();
-
-                    lati = location.getLatitude();
-                    longi = location.getLongitude();
-
-                } catch (Exception e) {
-                    // progDailog.dismiss();
-                    // Toast.makeText(getApplicationContext(),"Unable to get Location"
-                    // , Toast.LENGTH_LONG).show();
-                }
-
-            }
-
-            @Override
-            public void onProviderDisabled(String provider) {
-                Log.i("OnProviderDisabled", "OnProviderDisabled");
-            }
-
-            @Override
-            public void onProviderEnabled(String provider) {
-                Log.i("onProviderEnabled", "onProviderEnabled");
-            }
-
-            @Override
-            public void onStatusChanged(String provider, int status,
-                                        Bundle extras) {
-                Log.i("onStatusChanged", "onStatusChanged");
-
-            }
-
-        }
-
-
-
-
     }
 
-
-
-
-
-
-    /***********************************************************************************************************************/
-
-
-
-
-
-
 }
-
-
-

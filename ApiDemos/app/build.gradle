@@ -14,7 +14,7 @@ android {
     }
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
@@ -29,6 +29,9 @@ dependencies {
     implementation 'com.google.firebase:firebase-database:11.8.0'
     implementation 'com.google.firebase:firebase-auth:11.8.0'
     implementation 'com.google.android.gms:play-services-auth:11.8.0'
+    implementation 'com.google.android.gms:play-services-maps:11.8.0'
+    implementation 'com.google.android.gms:play-services-location:11.8.0'
+
 
 
 }

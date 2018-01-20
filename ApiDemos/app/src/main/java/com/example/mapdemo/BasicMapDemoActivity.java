@@ -29,7 +29,10 @@ import com.google.android.gms.location.places.ui.PlacePicker;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
+import com.google.android.gms.maps.OnStreetViewPanoramaReadyCallback;
+import com.google.android.gms.maps.StreetViewPanorama;
 import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.SupportStreetViewPanoramaFragment;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
@@ -91,10 +94,12 @@ public class BasicMapDemoActivity extends AppCompatActivity
 
     GoogleMap mGoogleMap;
     SupportMapFragment mapFrag;
+    SupportStreetViewPanoramaFragment mapFragPanorama;
     LocationRequest mLocationRequest;
     GoogleApiClient mGoogleApiClient;
     Location mLastLocation;
     Marker mCurrLocationMarker;
+    public StreetViewPanorama mPanorama;
 
      public static String TAG = "BasicMapDemoActivity";
     @Override
@@ -105,8 +110,24 @@ public class BasicMapDemoActivity extends AppCompatActivity
 
         getSupportActionBar().setTitle("Map Location Activity");
 
-        mapFrag = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
-        mapFrag.getMapAsync(this);
+        mapFragPanorama = (SupportStreetViewPanoramaFragment) getSupportFragmentManager().findFragmentById(R.id.streetviewpanorama );
+
+        mapFragPanorama.getStreetViewPanoramaAsync(
+                new OnStreetViewPanoramaReadyCallback() {
+                    @Override
+                    public void onStreetViewPanoramaReady(StreetViewPanorama panorama) {
+
+                        mPanorama = panorama;
+
+                        Toast.makeText(BasicMapDemoActivity.this, "onStreetViewPanoramaReady",  Toast.LENGTH_LONG).show();
+                        buildGoogleApiClient();
+
+
+                    }
+                });
+
+       // mapFrag = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
+       // mapFrag.getMapAsync(this);
     }
 
     @Override
@@ -176,11 +197,12 @@ public class BasicMapDemoActivity extends AppCompatActivity
 
                     //Place current location marker
                     LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
+                    mPanorama.setPosition( latLng );
                     MarkerOptions markerOptions = new MarkerOptions();
                     markerOptions.position(latLng);
                     markerOptions.title("Current Position");
                     markerOptions.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_MAGENTA));
-                    mCurrLocationMarker = mGoogleMap.addMarker(markerOptions);
+                  //  mCurrLocationMarker = mGoogleMap.addMarker(markerOptions);
 
                     double latitude = location.getLatitude();
                     double logitude = location.getLongitude();
@@ -188,7 +210,7 @@ public class BasicMapDemoActivity extends AppCompatActivity
                     String str = Double.toString( latitude ) + "   " + Double.toString( logitude ) ;
                     Toast.makeText(BasicMapDemoActivity.this, "onLocationChanged: "+str, Toast.LENGTH_LONG).show();
                     //move map camera
-                    mGoogleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng,11));
+                   // mGoogleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng,11));
 
 
                     // Instantiate latitude and longitude
@@ -285,7 +307,7 @@ public class BasicMapDemoActivity extends AppCompatActivity
                             Toast.makeText(this, "buildGoogleApiClient", Toast.LENGTH_LONG).show();
                             buildGoogleApiClient();
                         }
-                        mGoogleMap.setMyLocationEnabled(true);
+                      //  mGoogleMap.setMyLocationEnabled(true);
                     }
 
                 } else {
